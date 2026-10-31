@@ -43,8 +43,9 @@ test: $(BUILD)/Makefile
 # Bumps CMakeLists.txt and PKGBUILD, commits, tags, pushes, opens the release.
 release:
 	@test -n "$(VERSION)" || { echo "Usage: make release VERSION=0.2.0"; exit 1; }
+	@echo "$(VERSION)" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$$' || { echo "VERSION must be MAJOR.MINOR.PATCH"; exit 1; }
 	@test "$$(git rev-parse --abbrev-ref HEAD)" = "main" || { echo "Release from the main branch"; exit 1; }
-	@test -z "$$(git status --porcelain)" || { echo "Commit or stash your changes first"; exit 1; }
+	@test -z "$$(git status --porcelain | grep -v ' CHANGELOG.md$$')" || { echo "Commit or stash your changes first"; exit 1; }
 	@grep -q "## \[$(VERSION)\]" CHANGELOG.md || { \
 	  echo "Add a '## [$(VERSION)] - date' section to CHANGELOG.md first"; exit 1; }
 	@git rev-parse -q --verify "refs/tags/v$(VERSION)" >/dev/null && { \

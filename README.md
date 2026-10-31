@@ -106,12 +106,14 @@ flykooler cli sensors             # temperature sensors
 ## Releasing
 
 1. Move the `[Unreleased]` entries in [CHANGELOG.md](CHANGELOG.md) under a
-   new `## [X.Y.Z] - date` heading.
+   new `## [X.Y.Z] - date` heading, and leave the file uncommitted — the
+   release commit picks it up.
 2. `make release VERSION=X.Y.Z`
 
-The target refuses to run without the changelog entry or with a dirty tree;
-otherwise it runs the tests, bumps `CMakeLists.txt` and `PKGBUILD`, commits,
-tags, pushes the tag and opens a GitHub release with generated notes.
+The target refuses to run without a changelog entry, outside `main`, with a
+dirty tree (only `CHANGELOG.md` may be modified) or with a malformed version.
+It then runs the tests, bumps `CMakeLists.txt` and `PKGBUILD`, commits, tags,
+pushes the tag and opens a GitHub release with generated notes.
 Versions follow [SemVer](https://semver.org/); CI builds and tests every tag.
 
 ## Hardware notes
