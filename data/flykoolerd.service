@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: MIT
+# The backend runs as a systemd *user* service: a desktop-session tool must
+# not need a system-level root daemon. Good-tone notes:
+#   - Type=exec   — the start is confirmed once the binary is executed
+#   - Restart     — survives crashes without supervisor scripts
+#   - NoNewPrivileges — the daemon never needs to raise privileges
+# Enable:  systemctl --user enable --now flykoolerd
+# The unit ships to /usr/lib/systemd/user/ (distro package) or
+# ~/.config/systemd/user/ (manual user install); the latter wins if both exist.
+
+[Unit]
+Description=Flydigi Kooler — laptop cooler backend
+After=bluetooth.target
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/flykoolerd
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+# Event-only logging with a hard cap, to be gentle on the SSD:
+# at most 30 lines per 30 seconds even when the link flaps.
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=30
+
+[Install]
+WantedBy=default.target

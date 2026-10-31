@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Flydigi Kooler: вентилятор в стиле Breeze -->
+  <circle cx="32" cy="32" r="30" fill="#3daee9"/>
+  <g fill="#ffffff">
+    <ellipse cx="32" cy="17" rx="9" ry="7"/>
+    <ellipse cx="19" cy="39" rx="9" ry="7" transform="rotate(60 19 39)"/>
+    <ellipse cx="45" cy="39" rx="9" ry="7" transform="rotate(-60 45 39)"/>
+  </g>
+  <circle cx="32" cy="32" r="6" fill="#3daee9" stroke="#ffffff" stroke-width="2.5"/>
+</svg>

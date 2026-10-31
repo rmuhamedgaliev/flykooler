@@ -1,0 +1,4 @@
+# udev rule: access to Flydigi BS coolers (USB and Bluetooth) without root.
+# Install: sudo cp 70-flydigi-cooler.rules /etc/udev/rules.d/ && sudo udevadm control --reload && sudo udevadm trigger
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="37d7", MODE="0660", TAG+="uaccess"
+SUBSYSTEM=="hidraw", KERNELS=="*:37D7:*", MODE="0660", TAG+="uaccess"

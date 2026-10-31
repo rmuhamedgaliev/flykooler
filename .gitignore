@@ -1,0 +1,14 @@
+# build artefacts
+build*/
+*.o
+*.obj
+install_manifest.txt
+compile_commands.json
+.cache/
+
+# IDE / локальное
+.vscode/
+.idea/
+*.kdev4
+.kdev4/
+*.user

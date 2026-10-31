@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Flydigi Kooler
+GenericName=Laptop cooler control
+Comment=Fan and lighting for Flydigi BS coolers on KDE Plasma
+Exec=flykooler
+Icon=flykooler
+Categories=System;Utility;
+StartupNotify=false
+Terminal=false
+X-GNOME-Autostart-enabled=true
+SingleMainWindow=true
