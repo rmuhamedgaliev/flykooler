@@ -9,6 +9,7 @@
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QFile>
+#include <QFileInfo>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -36,6 +37,32 @@
 using namespace FlyKooler;
 
 static const char *const ModeNames[3] = {"smart", "fixed", "gear"};
+
+namespace {
+
+// A backend started by the GUI escapes Restart= and races the user unit for
+// the socket, so the installed GUI asks systemd instead. A development build
+// keeps starting the binary next to it.
+void startBackend()
+{
+    const QString local = QStringLiteral("%1/flykoolerd")
+                              .arg(QCoreApplication::applicationDirPath());
+    const QString installed = QStandardPaths::findExecutable(QStringLiteral("flykoolerd"));
+
+    if (!installed.isEmpty() &&
+        QFileInfo(local).canonicalFilePath() == QFileInfo(installed).canonicalFilePath()) {
+        QProcess systemctl;
+        systemctl.start(QStringLiteral("systemctl"),
+                        {QStringLiteral("--user"), QStringLiteral("start"),
+                         QStringLiteral("flykoolerd")});
+        if (systemctl.waitForFinished(700) &&
+            systemctl.exitStatus() == QProcess::NormalExit && systemctl.exitCode() == 0)
+            return;
+    }
+    QProcess::startDetached(local, {});
+}
+
+} // namespace
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -466,12 +493,9 @@ void MainWindow::connectToBackend()
 
     m_sock->connectToServer(daemonSocketPath());
     if (!m_sock->waitForConnected(150)) {
-        // first failure — start the backend ourselves, next to the GUI binary
-        if (m_backendTries == 0) {
-            QProcess::startDetached(
-                QStringLiteral("%1/flykoolerd").arg(QCoreApplication::applicationDirPath()),
-                {});
-        }
+        // first failure — start the backend
+        if (m_backendTries == 0)
+            startBackend();
         ++m_backendTries;
         if (m_backendTries > 30) {
             m_headerLabel->setText(

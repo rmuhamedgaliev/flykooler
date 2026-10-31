@@ -14,9 +14,15 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName(QStringLiteral("flykooler"));
 
     FlyKooler::Daemon daemon;
-    if (!daemon.start()) {
-        // already running — exit quietly
+    switch (daemon.start()) {
+    case FlyKooler::Daemon::StartResult::Started:
+        return app.exec();
+    case FlyKooler::Daemon::StartResult::AlreadyRunning:
+        // Normal when the GUI or systemd raced us; do not let
+        // Restart=on-failure spin on it.
         return 0;
+    case FlyKooler::Daemon::StartResult::Failed:
+        return 1;
     }
-    return app.exec();
+    return 1;
 }

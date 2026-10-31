@@ -12,9 +12,12 @@
 
 #include <QLocalServer>
 #include <QLocalSocket>
+#include <QLockFile>
 #include <QObject>
 #include <QSettings>
 #include <QTimer>
+
+#include <memory>
 
 namespace FlyKooler {
 
@@ -23,10 +26,13 @@ class Daemon : public QObject
     Q_OBJECT
 
 public:
+    enum class StartResult { Started, AlreadyRunning, Failed };
+
     explicit Daemon(QObject *parent = nullptr);
 
-    // Listen on the socket; false if the daemon is already running.
-    bool start();
+    // Listens on the socket. A second instance must not steal the socket from
+    // a running one: the cooler would then be driven by two processes.
+    StartResult start();
 
 private:
     void loadSettings();
@@ -50,6 +56,7 @@ private:
 
     Device m_device;
     QLocalServer m_server;
+    std::unique_ptr<QLockFile> m_lock; // held for the process lifetime
     QList<QLocalSocket *> m_clients;
     QTimer m_smartTimer;
 

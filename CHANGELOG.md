@@ -6,6 +6,12 @@ the versioning is [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- A second backend no longer unlinks a live socket and drives the cooler in
+  parallel: it takes a lock and probes the socket before listening
+- The installed GUI starts the systemd unit instead of spawning a backend
+  outside its supervision
+
 ### Changed
 - `make release` takes the GitHub release notes from the version's CHANGELOG
   section; generated notes are usually empty in a repository without PRs

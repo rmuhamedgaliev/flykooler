@@ -9,8 +9,6 @@
 #include <QJsonDocument>
 #include <QJsonParseError>
 
-#include <unistd.h>
-
 #include <cmath>
 
 using namespace FlyKooler;
@@ -39,15 +37,37 @@ Daemon::Daemon(QObject *parent)
     loadSettings();
 }
 
-bool Daemon::start()
+Daemon::StartResult Daemon::start()
 {
     qInfo("Flydigi Kooler backend %s", FLYKOOLER_VERSION);
-    ::unlink(daemonSocketPath().toLocal8Bit().constData());
-    if (!m_server.listen(daemonSocketPath())) {
-        qWarning("socket %s is busy — is the daemon already running?",
-                 qPrintable(daemonSocketPath()));
-        return false;
+
+    const QString socket = daemonSocketPath();
+    auto lock = std::make_unique<QLockFile>(socket + QStringLiteral(".lock"));
+    // A crashed daemon must not block the next start for the default 30 s.
+    lock->setStaleLockTime(0);
+    if (!lock->tryLock(0)) {
+        qWarning("another backend is running (lock %s)", qPrintable(lock->fileName()));
+        return StartResult::AlreadyRunning;
     }
+
+    // Older builds do not take the lock. If something still answers on the
+    // socket, leave it alone instead of unlinking a live server's file.
+    QLocalSocket probe;
+    probe.connectToServer(socket);
+    if (probe.waitForConnected(200)) {
+        probe.abort();
+        qWarning("socket %s is busy — is the daemon already running?", qPrintable(socket));
+        return StartResult::AlreadyRunning;
+    }
+
+    // The lock is ours, so a socket file left behind is stale.
+    QLocalServer::removeServer(socket);
+    if (!m_server.listen(socket)) {
+        qWarning("cannot listen on %s: %s", qPrintable(socket),
+                 qPrintable(m_server.errorString()));
+        return StartResult::Failed;
+    }
+    m_lock = std::move(lock);
     connect(&m_server, &QLocalServer::newConnection, this, [this] {
         while (QLocalSocket *client = m_server.nextPendingConnection()) {
             m_clients.push_back(client);
@@ -76,7 +96,7 @@ bool Daemon::start()
 
     m_device.start();
     m_smartTimer.start();
-    return true;
+    return StartResult::Started;
 }
 
 void Daemon::loadSettings()
