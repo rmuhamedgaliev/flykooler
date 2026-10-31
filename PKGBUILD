@@ -7,7 +7,7 @@
 # sha256sums.
 
 pkgname=flykooler
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc="Fan and lighting control for Flydigi BS laptop coolers (KDE Plasma / Qt 6)"
 arch=(x86_64 aarch64)

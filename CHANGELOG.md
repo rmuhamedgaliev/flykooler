@@ -6,10 +6,13 @@ the versioning is [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-01
+
 ### Added
-- `make release VERSION=X.Y.Z`: refuses to run without a changelog entry or
-  with a dirty tree, then tests, bumps `CMakeLists.txt` and `PKGBUILD`,
-  commits, tags, pushes and opens the GitHub release
+- `make release VERSION=X.Y.Z`: refuses to run without a changelog entry,
+  outside `main`, with a dirty tree or with a malformed version, then tests,
+  bumps `CMakeLists.txt` and `PKGBUILD`, commits, tags, pushes and opens the
+  GitHub release
 
 ### Changed
 - README lists which coolers are actually tested instead of implying support
@@ -34,5 +37,6 @@ Initial release.
 - Packaging: PKGBUILD (Arch), CPack (TGZ/DEB/RPM), udev rule, systemd
   user unit; GitHub Actions CI
 
-[Unreleased]: https://github.com/rmuhamedgaliev/flykooler/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/rmuhamedgaliev/flykooler/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/rmuhamedgaliev/flykooler/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/rmuhamedgaliev/flykooler/commits/v0.1.0
