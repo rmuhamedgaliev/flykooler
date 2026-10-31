@@ -14,7 +14,9 @@
 
 namespace FlyKooler {
 
-enum class Model { Bs1, Bs2Pro, Bs3, Bs3Pro, Unknown };
+// BS1 is deliberately absent: it speaks BLE/GATT rather than HID, so this
+// hidraw driver cannot control it.
+enum class Model { Bs2Pro, Bs3, Bs3Pro, Unknown };
 enum class Transport { Usb, Bluetooth };
 
 const char *modelName(Model m);

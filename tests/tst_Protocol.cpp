@@ -111,7 +111,8 @@ void TestProtocol::rejectsCorruptInput()
 
 void TestProtocol::mapsModelPids()
 {
-    QCOMPARE(modelFromPid(0x1001), Model::Bs1);
+    // BS1 is BLE-only; it must not be picked up by the hidraw driver.
+    QCOMPARE(modelFromPid(0x1001), Model::Unknown);
     QCOMPARE(modelFromPid(0x1002), Model::Bs2Pro);
     QCOMPARE(modelFromPid(0x1003), Model::Bs3);
     QCOMPARE(modelFromPid(0x1004), Model::Bs3Pro);

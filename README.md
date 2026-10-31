@@ -2,13 +2,24 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Fan, lighting and gear control for **Flydigi BS2 Pro / BS3 / BS3 Pro** laptop
-coolers on Linux — a native KDE Plasma / Qt 6 application with a
-client-server design.
+Fan, lighting and gear control for **Flydigi BS-series** laptop coolers on
+Linux — a native KDE Plasma / Qt 6 application with a client-server design.
 
-The protocol was captured from a live BS2 Pro (USB `37d7:1002`, `5A A5`
-frames, 0xEF status frames with the 9-byte BS2 Pro payload) and
-cross-checked against the BS3 Pro firmware disassembly from the
+## Supported hardware
+
+| Cooler | PID | Status |
+| --- | --- | --- |
+| BS1 | `37d7:1001` | Not supported: it speaks BLE/GATT, not HID |
+| BS2 Pro | `37d7:1002` | Tested over USB and Bluetooth |
+| BS3 | `37d7:1003` | Same protocol, untested on hardware |
+| BS3 Pro | `37d7:1004` | Same protocol, untested on hardware |
+
+Devices with any other PID are ignored instead of being sent frames their
+firmware does not expect.
+
+The protocol was captured from a live BS2 Pro (`5A A5` frames, 0xEF status
+frames with the 9-byte BS2 Pro payload) and cross-checked against the BS3 Pro
+firmware disassembly from the
 [flydigictl](https://github.com/ElXreno/flydigictl) project.
 
 ## Features
@@ -67,11 +78,15 @@ Targets: `make run` (build + run the GUI), `make clean`, `make distclean`,
 Without Qt6 Widgets the project builds backend-only (`flykoolerd` + CLI) —
 handy on headless machines: `cmake -B build -DFLYKOOLER_GUI=OFF`.
 
-After a system-wide install, add the udev rule:
+A distro package places the udev rule and the systemd user unit where they
+belong (`/usr/lib/udev/rules.d/`, `/usr/lib/systemd/user/`). For a manual
+prefix install, copy them yourself from `data/`:
 
 ```sh
-sudo cp /usr/local/share/flykooler/70-flydigi-cooler.rules /etc/udev/rules.d/
+sudo cp data/70-flydigi-cooler.rules /etc/udev/rules.d/
 sudo udevadm control --reload && sudo udevadm trigger
+mkdir -p ~/.config/systemd/user && cp data/flykoolerd.service ~/.config/systemd/user/
+systemctl --user enable --now flykoolerd   # the ExecStart path may need adjusting
 ```
 
 ## CLI
@@ -87,6 +102,17 @@ flykooler cli light effect 5      # a built-in effect
 flykooler cli standby 2           # sleep a minute after the link drops
 flykooler cli sensors             # temperature sensors
 ```
+
+## Releasing
+
+1. Move the `[Unreleased]` entries in [CHANGELOG.md](CHANGELOG.md) under a
+   new `## [X.Y.Z] - date` heading.
+2. `make release VERSION=X.Y.Z`
+
+The target refuses to run without the changelog entry or with a dirty tree;
+otherwise it runs the tests, bumps `CMakeLists.txt` and `PKGBUILD`, commits,
+tags, pushes the tag and opens a GitHub release with generated notes.
+Versions follow [SemVer](https://semver.org/); CI builds and tests every tag.
 
 ## Hardware notes
 

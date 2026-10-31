@@ -25,7 +25,6 @@ quint8 checksum(quint8 cmd, const QByteArray &payload)
 const char *modelName(Model m)
 {
     switch (m) {
-    case Model::Bs1:    return "BS1";
     case Model::Bs2Pro: return "BS2 Pro";
     case Model::Bs3:    return "BS3";
     case Model::Bs3Pro: return "BS3 Pro";
@@ -36,7 +35,9 @@ const char *modelName(Model m)
 Model modelFromPid(quint16 pid)
 {
     switch (pid) {
-    case 0x1001: return Model::Bs1;
+    // BS1 (0x1001) is BLE-only and not HID; ignoring it beats sending frames
+    // the firmware does not understand.
+    case 0x1001: return Model::Unknown;
     case 0x1002: return Model::Bs2Pro;
     case 0x1003: return Model::Bs3;
     case 0x1004: return Model::Bs3Pro;
