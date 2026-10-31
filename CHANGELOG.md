@@ -6,6 +6,8 @@ the versioning is [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-01
+
 ### Fixed
 - A second backend no longer unlinks a live socket and drives the cooler in
   parallel: it takes a lock and probes the socket before listening
@@ -47,6 +49,7 @@ Initial release.
 - Packaging: PKGBUILD (Arch), CPack (TGZ/DEB/RPM), udev rule, systemd
   user unit; GitHub Actions CI
 
-[Unreleased]: https://github.com/rmuhamedgaliev/flykooler/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/rmuhamedgaliev/flykooler/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/rmuhamedgaliev/flykooler/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/rmuhamedgaliev/flykooler/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/rmuhamedgaliev/flykooler/commits/v0.1.0
