@@ -6,6 +6,10 @@ the versioning is [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- `make release` takes the GitHub release notes from the version's CHANGELOG
+  section; generated notes are usually empty in a repository without PRs
+
 ## [0.1.1] - 2026-11-01
 
 ### Added

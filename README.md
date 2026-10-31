@@ -113,7 +113,8 @@ flykooler cli sensors             # temperature sensors
 The target refuses to run without a changelog entry, outside `main`, with a
 dirty tree (only `CHANGELOG.md` may be modified) or with a malformed version.
 It then runs the tests, bumps `CMakeLists.txt` and `PKGBUILD`, commits, tags,
-pushes the tag and opens a GitHub release with generated notes.
+pushes the tag and opens a GitHub release whose notes are the changelog
+section for that version.
 Versions follow [SemVer](https://semver.org/); CI builds and tests every tag.
 
 ## Hardware notes

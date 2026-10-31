@@ -40,7 +40,8 @@ test: $(BUILD)/Makefile
 	@cd $(BUILD) && ctest --output-on-failure
 
 # Cutting a release: the changelog entry must exist and the tests must pass.
-# Bumps CMakeLists.txt and PKGBUILD, commits, tags, pushes, opens the release.
+# Bumps CMakeLists.txt and PKGBUILD, commits, tags, pushes, opens the release
+# with that changelog section as the notes.
 release:
 	@test -n "$(VERSION)" || { echo "Usage: make release VERSION=0.2.0"; exit 1; }
 	@echo "$(VERSION)" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$$' || { echo "VERSION must be MAJOR.MINOR.PATCH"; exit 1; }
@@ -57,7 +58,10 @@ release:
 	@git commit -q -m "Release v$(VERSION)"
 	@git tag -a "v$(VERSION)" -m "Release v$(VERSION)"
 	@git push -q && git push -q origin "v$(VERSION)"
-	@gh release create "v$(VERSION)" --title "v$(VERSION)" --generate-notes
+	@notes=$$(mktemp); \
+	  awk '/^## \[/ { if (f) exit; if (index($$0, "[$(VERSION)]")) f=1; next } f' CHANGELOG.md | sed '/./,$$!d' > "$$notes"; \
+	  gh release create "v$(VERSION)" --title "v$(VERSION)" --notes-file "$$notes"; \
+	  rm -f "$$notes"
 	@echo "==> Released: https://github.com/rmuhamedgaliev/flykooler/releases/tag/v$(VERSION)"
 
 uninstall:
