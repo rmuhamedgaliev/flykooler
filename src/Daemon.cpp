@@ -8,6 +8,11 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonParseError>
+#include <QTimer>
+
+#ifdef FLYKOOLER_DBUS
+#include <QDBusConnection>
+#endif
 
 #include <cmath>
 
@@ -96,7 +101,95 @@ Daemon::StartResult Daemon::start()
 
     m_device.start();
     m_smartTimer.start();
+    watchLogind();
     return StartResult::Started;
+}
+
+void Daemon::watchLogind()
+{
+#ifdef FLYKOOLER_DBUS
+    QDBusConnection bus = QDBusConnection::systemBus();
+    if (!bus.isConnected()) {
+        qInfo("logind is unavailable: no suspend/shutdown hook");
+        return;
+    }
+    const auto subscribe = [&bus, this](const char *signal, const char *slot) {
+        if (!bus.connect(QStringLiteral("org.freedesktop.login1"),
+                         QStringLiteral("/org/freedesktop/login1"),
+                         QStringLiteral("org.freedesktop.login1.Manager"),
+                         QString::fromLatin1(signal), this, slot))
+            qWarning("cannot subscribe to logind %s", signal);
+    };
+    subscribe("PrepareForSleep", SLOT(onPrepareForSleep(bool)));
+    subscribe("PrepareForShutdown", SLOT(onPrepareForShutdown(bool)));
+#endif
+}
+
+void Daemon::onPrepareForSleep(bool start)
+{
+    if (start)
+        powerOffCooler();
+    else
+        resumeCooler();
+}
+
+void Daemon::onPrepareForShutdown(bool start)
+{
+    if (start)
+        powerOffCooler();
+    else
+        resumeCooler(); // the shutdown was cancelled
+}
+
+void Daemon::powerOffCooler()
+{
+    if (!m_connected || !m_cfg.offWithHost || m_hostOff)
+        return;
+    m_hostOff = true;
+    qInfo("host is going down: putting the cooler to sleep");
+    sleepCooler();
+}
+
+void Daemon::sleepCooler()
+{
+    // Drop a half-finished upload or a pending acknowledgement so the sleep
+    // frames are not stuck behind a reply that may never arrive.
+    m_device.cancelPending();
+    m_inRealtime = false;
+    m_lightReady = false;
+
+    // Stored in the cooler: a lost Bluetooth link now blanks it as well.
+    // A manual "off" must not rewrite the user's link-drop preference, so
+    // only the host-follow mode stores the immediate-sleep setting.
+    if (m_cfg.offWithHost)
+        m_device.sendCommand(Cmd::Standby, payload1(0x01), false);
+    // A USB cable keeps the cooler powered while the host sleeps and the
+    // firmware only reacts to a Bluetooth disconnect, so stop the fan and
+    // both light sources explicitly.
+    m_device.sendCommand(Cmd::EnterRealtime, {}, false);
+    m_device.sendCommand(Cmd::SetRealtimeRpm, payloadLe16(0), false);
+    m_device.sendCommand(Cmd::StripPower, payload1(0x00), false);
+    m_device.sendCommand(Cmd::GearLeds, payload1(0x00), false);
+}
+
+void Daemon::resumeCooler()
+{
+    if (!m_hostOff)
+        return;
+    m_hostOff = false;
+    if (!m_connected || !m_cfg.wake)
+        return;
+
+    qInfo("host is back: waking the cooler");
+    m_device.sendCommand(Cmd::Wake, {}, false);
+    QTimer::singleShot(1200, this, [this] {
+        if (!m_connected || m_hostOff)
+            return;
+        m_lightReady = false;
+        m_inRealtime = false;
+        m_lastSentRpm = -1;
+        applyConfig(m_cfg);
+    });
 }
 
 void Daemon::loadSettings()
@@ -130,6 +223,7 @@ void Daemon::loadSettings()
     c.gearLeds = s.value(QStringLiteral("light/gearLeds"), true).toBool();
     c.standby = s.value(QStringLiteral("system/standby"), 0).toInt();
     c.wake = s.value(QStringLiteral("system/wake"), true).toBool();
+    c.offWithHost = s.value(QStringLiteral("system/offWithHost"), true).toBool();
     c.autostart = s.value(QStringLiteral("system/autostart"), false).toBool();
 
     m_cfg = c;
@@ -155,6 +249,7 @@ void Daemon::saveSettings()
     s.setValue(QStringLiteral("light/gearLeds"), m_cfg.gearLeds);
     s.setValue(QStringLiteral("system/standby"), m_cfg.standby);
     s.setValue(QStringLiteral("system/wake"), m_cfg.wake);
+    s.setValue(QStringLiteral("system/offWithHost"), m_cfg.offWithHost);
     s.setValue(QStringLiteral("system/autostart"), m_cfg.autostart);
     s.sync(); // QSettings otherwise only writes on exit — and the daemon never exits
 }
@@ -163,6 +258,7 @@ void Daemon::onDeviceConnected(Model model, Transport transport, const QString &
 {
     Q_UNUSED(path);
     m_connected = true;
+    m_hostOff = false; // a live link is the host signal to come back
     m_model = model;
     m_transport = transport;
     m_inRealtime = false;
@@ -171,7 +267,14 @@ void Daemon::onDeviceConnected(Model model, Transport transport, const QString &
     qInfo("cooler connected: %s", modelName(model));
     broadcast(statusJson());
     applyConfig(m_cfg);
-    m_device.sendCommand(Cmd::Standby, payload1(quint8(m_cfg.standby))); // stored in the cooler
+
+    // 0x0D is stored in the cooler: with "sleep at once" a lost Bluetooth
+    // link also blanks the fan and both light sources. 0x0C off keeps the
+    // cooler from starting itself when the laptop applies power again.
+    m_device.sendCommand(Cmd::Standby,
+                         payload1(quint8(m_cfg.offWithHost ? 1 : m_cfg.standby)));
+    if (m_cfg.offWithHost)
+        m_device.sendCommand(Cmd::AutoStart, payload1(0x02), false);
 }
 
 void Daemon::onDeviceDisconnected()
@@ -184,9 +287,21 @@ void Daemon::onDeviceDisconnected()
 
 void Daemon::onStatus(const Status &status)
 {
+    const bool woke = m_status.asleep && !status.asleep;
     m_status = status;
     if (!status.realtime)
         m_inRealtime = false;
+
+    // Woken by the device button (or by a new host link): the firmware
+    // restores its own gear, so put our configuration back on top.
+    if (woke && m_connected && !m_hostOff) {
+        m_inRealtime = false;
+        m_lastSentRpm = -1;
+        QTimer::singleShot(500, this, [this] {
+            if (m_connected && !m_hostOff && !m_status.asleep)
+                applyConfig(m_cfg);
+        });
+    }
     broadcast(statusJson());
 }
 
@@ -204,8 +319,19 @@ void Daemon::onAck(quint8 cmd, const QByteArray &payload)
         }
         break;
     case Cmd::PowerState:
-        if (payload.size() >= 1 && quint8(payload[0]) == 0x02 && m_cfg.wake)
+        if (payload.size() >= 1 && quint8(payload[0]) == 0x02 && m_cfg.wake) {
             m_device.sendCommand(Cmd::Wake);
+            // The fan/lighting frames sent while it was asleep were dropped:
+            // apply them again once it is awake.
+            QTimer::singleShot(1200, this, [this] {
+                if (!m_connected || m_hostOff)
+                    return;
+                m_lightReady = false;
+                m_inRealtime = false;
+                m_lastSentRpm = -1;
+                applyConfig(m_cfg);
+            });
+        }
         break;
     case Cmd::QueryGearTable:
         if (payload.size() >= 8) {
@@ -221,7 +347,7 @@ void Daemon::onAck(quint8 cmd, const QByteArray &payload)
 
 void Daemon::applyConfig(const Config &previous)
 {
-    if (!m_connected)
+    if (!m_connected || m_hostOff)
         return;
 
     // the light changed or was never applied — re-upload (flash only on change)
@@ -235,8 +361,15 @@ void Daemon::applyConfig(const Config &previous)
     if (previous.gearLeds != m_cfg.gearLeds)
         applyLighting(false);
 
-    if (previous.standby != m_cfg.standby)
-        m_device.sendCommand(Cmd::Standby, payload1(quint8(m_cfg.standby)));
+    if (previous.standby != m_cfg.standby || previous.offWithHost != m_cfg.offWithHost) {
+        const int standby = m_cfg.offWithHost ? 1 : m_cfg.standby;
+        m_device.sendCommand(Cmd::Standby, payload1(quint8(standby)));
+    }
+    if (previous.offWithHost != m_cfg.offWithHost) {
+        // off: the cooler may start itself again when power is applied
+        m_device.sendCommand(Cmd::AutoStart,
+                             payload1(m_cfg.offWithHost ? 0x02 : 0x01), false);
+    }
 
     applyFanMode();
 }
@@ -299,7 +432,7 @@ void Daemon::applyLighting(bool force)
 
 void Daemon::smartTick()
 {
-    if (!m_connected || m_cfg.fanMode != QStringLiteral("smart"))
+    if (!m_connected || m_hostOff || m_cfg.fanMode != QStringLiteral("smart"))
         return;
 
     double t = std::numeric_limits<double>::quiet_NaN();
@@ -367,6 +500,7 @@ QJsonObject Daemon::statusJson() const
         {QStringLiteral("supply"), m_status.supplyLevel},
         {QStringLiteral("rpmCeil"), m_status.maxRpm()},
         {QStringLiteral("asleep"), m_status.asleep},
+        {QStringLiteral("off"), m_hostOff},
         {QStringLiteral("gearRpms"), gearTable},
     };
     if (!std::isnan(m_lastTemp)) {
@@ -412,8 +546,26 @@ void Daemon::handleRequest(QLocalSocket *client, const QJsonObject &request)
         sendTo(client, QJsonObject{{QStringLiteral("type"), QStringLiteral("reply")},
                                    {QStringLiteral("ok"), true}});
     } else if (req == QStringLiteral("wake")) {
+        m_hostOff = false;
+        if (m_connected) {
+            m_device.sendCommand(Cmd::Wake, {}, false);
+            QTimer::singleShot(1200, this, [this] {
+                if (!m_connected)
+                    return;
+                m_lightReady = false;
+                m_inRealtime = false;
+                m_lastSentRpm = -1;
+                applyConfig(m_cfg);
+            });
+        }
+        broadcast(statusJson());
+        sendTo(client, QJsonObject{{QStringLiteral("type"), QStringLiteral("reply")},
+                                   {QStringLiteral("ok"), true}});
+    } else if (req == QStringLiteral("sleep")) {
+        m_hostOff = true;
         if (m_connected)
-            m_device.sendCommand(Cmd::Wake);
+            sleepCooler();
+        broadcast(statusJson());
         sendTo(client, QJsonObject{{QStringLiteral("type"), QStringLiteral("reply")},
                                    {QStringLiteral("ok"), true}});
     } else if (req == QStringLiteral("gear_rpm")) {

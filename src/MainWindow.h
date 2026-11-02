@@ -58,6 +58,7 @@ private:
     void fillSensors(const class QJsonArray &sensors);
     void setUiEnabled(bool on);
     void updateHeader();
+    void updatePowerState();
     void updateTray();
     void setAutostart(bool on);
     static QString autostartPath();
@@ -77,14 +78,19 @@ private:
     int m_currentRpm = 0, m_targetRpm = 0, m_gear = 0, m_supply = 0, m_rpmCeil = 4000;
     int m_gearRpm[4] = {0, 0, 0, 0};
     bool m_asleep = false;
+    bool m_coolerOff = false; // manual "off" (or the host went down)
     double m_lastTemp = qQNaN();
     int m_smartRpm = 0;
     bool m_shutdown = false;
 
     // --- widgets ---
     QLabel *m_headerLabel = nullptr;
+    QLabel *m_stateDot = nullptr;
+    QLabel *m_stateLabel = nullptr;
     QLabel *m_rpmLabel = nullptr;
     QLabel *m_tempLabel = nullptr;
+    QPushButton *m_powerOnBtn = nullptr;
+    QPushButton *m_powerOffBtn = nullptr;
     QComboBox *m_modeCombo = nullptr;
     QStackedWidget *m_modeStack = nullptr;
     QComboBox *m_sensorCombo = nullptr;
@@ -102,6 +108,7 @@ private:
     QLabel *m_brightLabel = nullptr;
     QCheckBox *m_gearLedsChk = nullptr;
     QComboBox *m_standbyCombo = nullptr;
+    QCheckBox *m_offWithHostChk = nullptr;
     QCheckBox *m_wakeChk = nullptr;
     QCheckBox *m_autostartChk = nullptr;
     QSystemTrayIcon *m_tray = nullptr;

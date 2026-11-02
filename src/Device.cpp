@@ -174,6 +174,13 @@ void Device::closeDevice()
     m_queue.clear();
 }
 
+void Device::cancelPending()
+{
+    m_queue.clear();
+    m_pendingCmd = 0;
+    m_ackTimer.stop();
+}
+
 void Device::sendCommand(quint8 cmd, const QByteArray &payload, bool expectAck)
 {
     // 0xDF erases the firmware, 0x06 is a factory reset: never send either.

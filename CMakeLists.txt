@@ -30,6 +30,10 @@ if(NOT Qt6_FOUND)
     "  openSUSE       : sudo zypper install qt6-base-devel")
 endif()
 
+# Optional: Qt6 DBus for logind's suspend/shutdown signals. Without it the
+# backend still stops the cooler on SIGTERM, but not on suspend.
+find_package(Qt6 6.4 OPTIONAL_COMPONENTS DBus)
+
 # Optional: Qt6 Widgets for the GUI. Without it only the flykoolerd backend
 # and the CLI are built — handy on headless machines.
 if(FLYKOOLER_GUI)
@@ -55,6 +59,12 @@ qt_add_executable(flykoolerd
     src/Daemon.cpp
     ${FLYKOOLER_CORE})
 target_link_libraries(flykoolerd PRIVATE Qt6::Core Qt6::Network)
+if(Qt6DBus_FOUND)
+  target_link_libraries(flykoolerd PRIVATE Qt6::DBus)
+  target_compile_definitions(flykoolerd PRIVATE FLYKOOLER_DBUS)
+else()
+  message(STATUS "Qt6 DBus not found — no suspend hook through logind.")
+endif()
 
 # ---- GUI client and CLI ----------------------------------------------------
 if(FLYKOOLER_GUI)

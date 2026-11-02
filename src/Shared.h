@@ -31,6 +31,9 @@ struct Config {
 
     int standby = 0;                           // 0/1/2
     bool wake = true;
+    // Follow the host: put the cooler to sleep when the laptop suspends or
+    // shuts down, and do not let it start itself when power comes back.
+    bool offWithHost = true;
     bool autostart = false;
 
     QJsonObject toJson() const;

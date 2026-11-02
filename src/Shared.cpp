@@ -41,6 +41,7 @@ QJsonObject Config::toJson() const
         {QStringLiteral("gearLeds"), gearLeds},
         {QStringLiteral("standby"), standby},
         {QStringLiteral("wake"), wake},
+        {QStringLiteral("offWithHost"), offWithHost},
         {QStringLiteral("autostart"), autostart},
     };
 }
@@ -94,6 +95,7 @@ Config Config::fromJson(const QJsonObject &o)
 
     c.standby = qBound(0, o.value(QStringLiteral("standby")).toInt(c.standby), 2);
     c.wake = o.value(QStringLiteral("wake")).toBool(c.wake);
+    c.offWithHost = o.value(QStringLiteral("offWithHost")).toBool(c.offWithHost);
     c.autostart = o.value(QStringLiteral("autostart")).toBool(c.autostart);
 
     return c;

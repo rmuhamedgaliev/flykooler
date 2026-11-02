@@ -40,6 +40,9 @@ public slots:
     void start();
     void stop();
     void sendCommand(quint8 cmd, const QByteArray &payload = {}, bool expectAck = true);
+    // Drop a pending acknowledgement and everything still queued. Used before
+    // a shutdown frame so a stale reply cannot hold it back.
+    void cancelPending();
 
 signals:
     void connected(FlyKooler::Model model, FlyKooler::Transport transport, const QString &path);

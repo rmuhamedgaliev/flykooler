@@ -42,6 +42,9 @@ static void printUsage()
               "  light color RRGGBB [brightness]\n"
               "  light effect <1–5> [brightness]\n"
               "  standby <0|1|2>        — behaviour when the link drops\n"
+              "  host on|off            — turn the cooler off with the laptop\n"
+              "  off                    — stop the fan and put the cooler to sleep\n"
+              "  wake                   — wake the cooler\n"
               "  sensors                — temperature sensors");
 }
 
@@ -174,6 +177,32 @@ static int runIpcCli(const QStringList &args)
                    ? (std::puts("The backend did not answer"), 1)
                    : (std::puts("Done"), 0);
     }
+    if (cmd == QStringLiteral("off")) {
+        return roundTrip(QJsonObject{{QStringLiteral("request"), QStringLiteral("sleep")}},
+                         QStringLiteral("reply"))
+                       .isEmpty()
+                   ? (std::puts("The backend did not answer"), 1)
+                   : (std::puts("Done"), 0);
+    }
+    if (cmd == QStringLiteral("wake")) {
+        return roundTrip(QJsonObject{{QStringLiteral("request"), QStringLiteral("wake")}},
+                         QStringLiteral("reply"))
+                       .isEmpty()
+                   ? (std::puts("The backend did not answer"), 1)
+                   : (std::puts("Done"), 0);
+    }
+    if (cmd == QStringLiteral("host")) {
+        const QString what = args.value(1);
+        if (what != QStringLiteral("on") && what != QStringLiteral("off")) {
+            std::puts("flykooler cli host on|off");
+            return 1;
+        }
+        return setConfig(QJsonObject{{QStringLiteral("offWithHost"),
+                                      what == QStringLiteral("on")}})
+                       .isEmpty()
+                   ? (std::puts("The backend did not answer"), 1)
+                   : (std::puts("Done"), 0);
+    }
     if (cmd == QStringLiteral("auto")) {
         return setConfig(QJsonObject{{QStringLiteral("fanMode"), QStringLiteral("gear")}})
                        .isEmpty()
@@ -259,7 +288,7 @@ static int runCli(QCoreApplication &app, const QStringList &args)
     }
     const QString cmd = args[0];
     quint16 rpm = 0;
-    int gear = 0, effect = 0, standbyMode = -1;
+    int gear = 0, effect = 0, standbyMode = -1, hostMode = -1;
     QString lightArg, colorHex;
     quint8 brightness = 100;
 
@@ -283,6 +312,16 @@ static int runCli(QCoreApplication &app, const QStringList &args)
         standbyMode = args.value(1).toInt();
         if (standbyMode < 0 || standbyMode > 2) {
             std::puts("Standby: 0 — stay awake, 1 — at once, 2 — after a minute");
+            return 1;
+        }
+    } else if (cmd == QStringLiteral("host")) {
+        const QString what = args.value(1);
+        if (what == QStringLiteral("on"))
+            hostMode = 1;
+        else if (what == QStringLiteral("off"))
+            hostMode = 0;
+        else {
+            std::puts("flykooler cli host on|off");
             return 1;
         }
     } else if (cmd == QStringLiteral("light")) {
@@ -309,7 +348,8 @@ static int runCli(QCoreApplication &app, const QStringList &args)
             return 1;
         }
     } else if (cmd != QStringLiteral("status") && cmd != QStringLiteral("info") &&
-               cmd != QStringLiteral("auto") && cmd != QStringLiteral("stop")) {
+               cmd != QStringLiteral("auto") && cmd != QStringLiteral("stop") &&
+               cmd != QStringLiteral("off") && cmd != QStringLiteral("wake")) {
         printUsage();
         return 1;
     }
@@ -343,6 +383,21 @@ static int runCli(QCoreApplication &app, const QStringList &args)
             wantAck = Cmd::SetRealtimeRpm;
             dev.sendCommand(Cmd::EnterRealtime);
             dev.sendCommand(Cmd::SetRealtimeRpm, payloadLe16(0));
+        } else if (cmd == QStringLiteral("off")) {
+            // same sequence as the backend's sleepCooler()
+            dev.sendCommand(Cmd::Standby, payload1(0x01), false);
+            dev.sendCommand(Cmd::EnterRealtime, {}, false);
+            dev.sendCommand(Cmd::SetRealtimeRpm, payloadLe16(0), false);
+            dev.sendCommand(Cmd::StripPower, payload1(0x00), false);
+            dev.sendCommand(Cmd::GearLeds, payload1(0x00), false);
+            QTimer::singleShot(200, &loop, &QEventLoop::quit);
+        } else if (cmd == QStringLiteral("wake")) {
+            wantAck = Cmd::Wake;
+            dev.sendCommand(Cmd::Wake);
+        } else if (cmd == QStringLiteral("host")) {
+            wantAck = Cmd::Standby;
+            dev.sendCommand(Cmd::AutoStart, payload1(hostMode ? 0x02 : 0x01), false);
+            dev.sendCommand(Cmd::Standby, payload1(hostMode ? 0x01 : 0x00));
         } else if (cmd == QStringLiteral("auto")) {
             wantAck = Cmd::ExitRealtime;
             dev.sendCommand(Cmd::ExitRealtime);

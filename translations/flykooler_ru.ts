@@ -191,6 +191,14 @@
         <translation>заснуть через минуту</translation>
     </message>
     <message>
+        <source>Turn the cooler off when the laptop sleeps or shuts down</source>
+        <translation>Выключать подставку при сне и завершении работы ноутбука</translation>
+    </message>
+    <message>
+        <source>The cooler stays off until the laptop wakes it again</source>
+        <translation>Подставка остаётся выключенной, пока ноутбук снова её не разбудит</translation>
+    </message>
+    <message>
         <location filename="../src/MainWindow.cpp" line="374" />
         <source>Wake the cooler on connect</source>
         <translation>Будить подставку при подключении</translation>
@@ -329,6 +337,42 @@
         <location filename="../src/MainWindow.cpp" line="710" />
         <source>firmware %1</source>
         <translation>прошивка %1</translation>
+    </message>
+    <message>
+        <source>Turn on</source>
+        <translation>Включить</translation>
+    </message>
+    <message>
+        <source>Turn off</source>
+        <translation>Выключить</translation>
+    </message>
+    <message>
+        <source>Wake the cooler and restore the settings</source>
+        <translation>Разбудить подставку и применить настройки</translation>
+    </message>
+    <message>
+        <source>Stop the fan, blank the light and put the cooler to sleep</source>
+        <translation>Остановить вентилятор, погасить подсветку и усыпить подставку</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <translation>Включена</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>Выключена</translation>
+    </message>
+    <message>
+        <source>Backend unavailable</source>
+        <translation>Бэкенд недоступен</translation>
+    </message>
+    <message>
+        <source>Turn the cooler off</source>
+        <translation>Выключить подставку</translation>
+    </message>
+    <message>
+        <source>Turn the cooler on</source>
+        <translation>Включить подставку</translation>
     </message>
 </context>
 </TS>

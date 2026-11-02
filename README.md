@@ -32,6 +32,11 @@ firmware disassembly from the
 - Live status: rpm, target, gear, power supply level with the rpm ceiling
   (2700 / 3300 / 4000)
 - Plasma tray: mode switching, fan stop, connect notifications
+- Power state badge — green when the cooler is running, red when it is off —
+  with manual *Turn on* / *Turn off* buttons in the window and the tray menu
+- Follows the host: the cooler is put to sleep when the laptop suspends or
+  shuts down, its own auto-start is disabled, and it is woken only when the
+  laptop comes back
 - Auto-connection over cable or Bluetooth with hot reconnect
 - Client-server design: the backend owns the device, GUI and CLI are clients
   on a Unix socket, the fan curve keeps running with the window closed
@@ -100,6 +105,9 @@ flykooler cli gear 3              # the "strong" gear
 flykooler cli light color 00E0B8 40   # colour and brightness
 flykooler cli light effect 5      # a built-in effect
 flykooler cli standby 2           # sleep a minute after the link drops
+flykooler cli host on             # turn the cooler off with the laptop
+flykooler cli off                 # stop the fan and put the cooler to sleep
+flykooler cli wake                # wake it again
 flykooler cli sensors             # temperature sensors
 ```
 
@@ -125,6 +133,12 @@ Versions follow [SemVer](https://semver.org/); CI builds and tests every tag.
 - While a data cable is plugged in, the cooler's BLE stays off — that is
   normal.
 - The rpm ceiling is enforced by the firmware itself per supply level.
+- "Sleep" is a firmware state: it stops the fan and blanks both light
+  sources. With *Turn the cooler off when the laptop sleeps or shuts down*
+  the backend stores "sleep at once" in the cooler and disables its
+  auto-start, so a separate power supply does not switch it on by itself.
+  The host wakes it on resume or at the next login; a press of the button on
+  the cooler also brings it back without the host.
 
 ## Credits
 

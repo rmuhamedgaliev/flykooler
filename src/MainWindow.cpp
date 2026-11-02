@@ -81,6 +81,38 @@ MainWindow::MainWindow(QWidget *parent)
     m_headerLabel->setWordWrap(true);
     root->addWidget(m_headerLabel);
 
+    // Power state and manual on/off: green is running, red is off.
+    auto *powerRow = new QHBoxLayout;
+    powerRow->setSpacing(8);
+    m_stateDot = new QLabel(central);
+    m_stateDot->setFixedSize(12, 12);
+    powerRow->addWidget(m_stateDot);
+    m_stateLabel = new QLabel(central);
+    powerRow->addWidget(m_stateLabel);
+    powerRow->addStretch(1);
+    m_powerOnBtn = new QPushButton(tr("Turn on"), central);
+    m_powerOnBtn->setToolTip(tr("Wake the cooler and restore the settings"));
+    m_powerOnBtn->setStyleSheet(QStringLiteral(
+        "QPushButton { color: #ffffff; background: #2e7d32; border: none;"
+        " border-radius: 4px; padding: 5px 14px; font-weight: 600; }"
+        "QPushButton:disabled { background: #bdbdbd; }"));
+    m_powerOffBtn = new QPushButton(tr("Turn off"), central);
+    m_powerOffBtn->setToolTip(
+        tr("Stop the fan, blank the light and put the cooler to sleep"));
+    m_powerOffBtn->setStyleSheet(QStringLiteral(
+        "QPushButton { color: #ffffff; background: #c62828; border: none;"
+        " border-radius: 4px; padding: 5px 14px; font-weight: 600; }"
+        "QPushButton:disabled { background: #bdbdbd; }"));
+    connect(m_powerOnBtn, &QPushButton::clicked, this, [this] {
+        sendJson(QJsonObject{{QStringLiteral("request"), QStringLiteral("wake")}});
+    });
+    connect(m_powerOffBtn, &QPushButton::clicked, this, [this] {
+        sendJson(QJsonObject{{QStringLiteral("request"), QStringLiteral("sleep")}});
+    });
+    powerRow->addWidget(m_powerOnBtn);
+    powerRow->addWidget(m_powerOffBtn);
+    root->addLayout(powerRow);
+
     root->addWidget(buildFanGroup());
     root->addWidget(buildLightGroup());
     root->addWidget(buildSystemGroup());
@@ -108,6 +140,7 @@ MainWindow::MainWindow(QWidget *parent)
     fillCurveTable();
     setUiEnabled(false);
     updateHeader();
+    updatePowerState();
     updateTray();
 
     connectToBackend();
@@ -397,6 +430,20 @@ QWidget *MainWindow::buildSystemGroup()
     row->addWidget(m_standbyCombo, 1);
     lay->addLayout(row);
 
+    m_offWithHostChk = new QCheckBox(
+        tr("Turn the cooler off when the laptop sleeps or shuts down"), box);
+    m_offWithHostChk->setToolTip(
+        tr("The cooler stays off until the laptop wakes it again"));
+    connect(m_offWithHostChk, &QCheckBox::toggled, this, [this](bool on) {
+        m_cfg.offWithHost = on;
+        m_standbyCombo->setEnabled(!on);
+        m_standbyCombo->blockSignals(true);
+        m_standbyCombo->setCurrentIndex(on ? 1 : qBound(0, m_cfg.standby, 2));
+        m_standbyCombo->blockSignals(false);
+        pushConfig();
+    });
+    lay->addWidget(m_offWithHostChk);
+
     m_wakeChk = new QCheckBox(tr("Wake the cooler on connect"), box);
     m_wakeChk->setChecked(true);
     connect(m_wakeChk, &QCheckBox::toggled, this, [this](bool on) {
@@ -442,6 +489,12 @@ void MainWindow::buildTray()
     menu->addSeparator();
     menu->addAction(tr("Stop the fan"), this, [this] {
         sendJson(QJsonObject{{QStringLiteral("request"), QStringLiteral("stop")}});
+    });
+    menu->addAction(tr("Turn the cooler off"), this, [this] {
+        sendJson(QJsonObject{{QStringLiteral("request"), QStringLiteral("sleep")}});
+    });
+    menu->addAction(tr("Turn the cooler on"), this, [this] {
+        sendJson(QJsonObject{{QStringLiteral("request"), QStringLiteral("wake")}});
     });
     menu->addSeparator();
     menu->addAction(tr("Quit"), this, [this] {
@@ -535,6 +588,7 @@ void MainWindow::onBackendMessage(const QJsonObject &msg)
         m_supply = msg.value(QStringLiteral("supply")).toInt();
         m_rpmCeil = msg.value(QStringLiteral("rpmCeil")).toInt();
         m_asleep = msg.value(QStringLiteral("asleep")).toBool();
+        m_coolerOff = msg.value(QStringLiteral("off")).toBool();
         const QJsonValue t = msg.value(QStringLiteral("temp"));
         if (t.isDouble())
             m_lastTemp = t.toDouble();
@@ -580,6 +634,7 @@ void MainWindow::onBackendMessage(const QJsonObject &msg)
                 m_gearBtns[k]->setChecked(k + 1 == m_gear);
         }
         updateHeader();
+        updatePowerState();
         updateTray();
     } else if (type == QStringLiteral("config")) {
         m_cfg = Config::fromJson(msg.value(QStringLiteral("config")).toObject(), m_cfg);
@@ -600,6 +655,7 @@ void MainWindow::applyConfigToUi()
     m_stripChk->blockSignals(true);
     m_gearLedsChk->blockSignals(true);
     m_standbyCombo->blockSignals(true);
+    m_offWithHostChk->blockSignals(true);
     m_wakeChk->blockSignals(true);
     m_autostartChk->blockSignals(true);
 
@@ -622,6 +678,12 @@ void MainWindow::applyConfigToUi()
     m_brightLabel->setText(QString::number(m_brightSlider->value()) + u'%');
     m_gearLedsChk->setChecked(m_cfg.gearLeds);
     m_standbyCombo->setCurrentIndex(qBound(0, m_cfg.standby, 2));
+    m_offWithHostChk->setChecked(m_cfg.offWithHost);
+    // With "off with the host" the cooler always sleeps at once on a link
+    // loss; the detailed choice only matters when that option is off.
+    m_standbyCombo->setEnabled(!m_cfg.offWithHost);
+    if (m_cfg.offWithHost)
+        m_standbyCombo->setCurrentIndex(1);
     m_wakeChk->setChecked(m_cfg.wake);
     m_autostartChk->setChecked(m_cfg.autostart);
     for (int k = 0; k < 4; ++k)
@@ -635,6 +697,7 @@ void MainWindow::applyConfigToUi()
     m_stripChk->blockSignals(false);
     m_gearLedsChk->blockSignals(false);
     m_standbyCombo->blockSignals(false);
+    m_offWithHostChk->blockSignals(false);
     m_wakeChk->blockSignals(false);
     m_autostartChk->blockSignals(false);
 }
@@ -707,6 +770,7 @@ void MainWindow::setUiEnabled(bool on)
         b->setEnabled(on);
     if (!on)
         m_rpmLabel->setText(tr("No backend link"));
+    updatePowerState();
 }
 
 void MainWindow::updateHeader()
@@ -730,6 +794,34 @@ void MainWindow::updateHeader()
             .arg(m_model.isEmpty() ? QStringLiteral("BS") : m_model,
                  m_link.isEmpty() ? tr("no host link") : m_link, supply,
                  m_fw.isEmpty() ? tr("firmware: ?") : tr("firmware %1").arg(m_fw)));
+}
+
+void MainWindow::updatePowerState()
+{
+    if (!m_stateDot || !m_stateLabel || !m_powerOnBtn || !m_powerOffBtn)
+        return;
+
+    QString color = QStringLiteral("#9e9e9e");
+    QString text = tr("Backend unavailable");
+
+    if (m_backendUp && m_deviceConnected) {
+        const bool off = m_asleep || m_coolerOff;
+        color = off ? QStringLiteral("#e53935") : QStringLiteral("#43a047");
+        text = off ? tr("Off") : tr("On");
+        m_powerOnBtn->setEnabled(off);
+        m_powerOffBtn->setEnabled(!off);
+    } else {
+        if (m_backendUp)
+            text = tr("No cooler link");
+        m_powerOnBtn->setEnabled(false);
+        m_powerOffBtn->setEnabled(false);
+    }
+
+    m_stateDot->setStyleSheet(
+        QStringLiteral("background-color: %1; border-radius: 6px;").arg(color));
+    m_stateLabel->setStyleSheet(
+        QStringLiteral("color: %1; font-weight: 600;").arg(color));
+    m_stateLabel->setText(text);
 }
 
 void MainWindow::updateTray()

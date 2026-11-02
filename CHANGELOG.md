@@ -6,6 +6,20 @@ the versioning is [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Power state in the window: a green/red badge shows whether the cooler is
+  running or off, and *Turn on* / *Turn off* buttons (also in the tray menu)
+  wake it or put it to sleep by hand
+- The cooler follows the host: on suspend or shutdown the backend stops the
+  fan, blanks the light and puts it to sleep, and disables the cooler's own
+  auto-start so power alone does not switch it on. It is woken again on
+  resume or the next connection. Controlled by "Turn the cooler off when the
+  laptop sleeps or shuts down", `flykooler cli host on|off`, and the new
+  `off` / `wake` CLI commands
+- logind's `PrepareForSleep` / `PrepareForShutdown` signals are used when
+  Qt DBus is available; `SIGTERM` / `SIGINT` / `SIGHUP` cover logout and
+  service stop
+
 ## [0.1.2] - 2026-11-01
 
 ### Fixed

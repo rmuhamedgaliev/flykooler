@@ -39,6 +39,7 @@ Config TestConfig::sample() const
     c.gearLeds = false;
     c.standby = 2;
     c.wake = false;
+    c.offWithHost = false;
     c.autostart = true;
     return c;
 }
@@ -68,6 +69,7 @@ void TestConfig::partialUpdateKeepsTheRest()
     QCOMPARE(merged.color, base.color);
     QCOMPARE(merged.standby, base.standby);
     QCOMPARE(merged.wake, base.wake);
+    QCOMPARE(merged.offWithHost, base.offWithHost);
 }
 
 void TestConfig::clampsAndRejectsBadValues()

@@ -34,7 +34,19 @@ public:
     // a running one: the cooler would then be driven by two processes.
     StartResult start();
 
+    // Stop the fan and the light and send the cooler to sleep before the host
+    // suspends or powers off. Safe to call more than once.
+    void powerOffCooler();
+
+private slots:
+    void onPrepareForSleep(bool start);
+    void onPrepareForShutdown(bool start);
+
 private:
+    void watchLogind();
+    void sleepCooler();
+    void resumeCooler();
+
     void loadSettings();
     void saveSettings();
 
@@ -64,6 +76,7 @@ private:
     bool m_lightReady = false; // the strip holds our buffer already
 
     bool m_connected = false;
+    bool m_hostOff = false; // sleep was requested because the host went down
     Status m_status;
     Model m_model = Model::Unknown;
     Transport m_transport = Transport::Bluetooth;
