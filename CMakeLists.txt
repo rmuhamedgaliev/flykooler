@@ -2,7 +2,7 @@
 
 cmake_minimum_required(VERSION 3.24)
 project(FlyKooler
-        VERSION 0.1.2
+        VERSION 0.2.0
         DESCRIPTION "Control for Flydigi BS laptop coolers on KDE Plasma"
         LANGUAGES CXX)
 

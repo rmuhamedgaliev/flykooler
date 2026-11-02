@@ -6,6 +6,8 @@ the versioning is [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-02
+
 ### Added
 - Power state in the window: a green/red badge shows whether the cooler is
   running or off, and *Turn on* / *Turn off* buttons (also in the tray menu)
